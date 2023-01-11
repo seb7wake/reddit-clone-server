@@ -9,13 +9,6 @@ import { buildSchema } from "type-graphql";
 import { HelloResolver } from "./resolvers/hello";
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user";
-import session from "express-session";
-import connectRedis from "connect-redis";
-import { createClient } from "redis"; // redis@v4
-
-const RedisStore = connectRedis(session);
-const redisClient = createClient({ legacyMode: true });
-redisClient.connect().catch(console.error);
 
 const main = async () => {
   const orm = await MikroORM.init(mikroOrmConfig);
@@ -29,28 +22,6 @@ const main = async () => {
   // const post = await orm.em.find(Post, {})
 
   const app = express();
-
-  // use redis as session store (step 4)
-  app.use(
-    session({
-      name: "qid", // cookie name
-      store: new RedisStore({
-        client: redisClient,
-        // disable updating the session in redis (session lasts forever)
-        disableTouch: true,
-      }),
-      cookie: {
-        maxAge: 1000 * 60 * 60 * 24 * 365 * 10, // 10 years
-        httpOnly: true, // cookie can only be accessed by the server
-        // often times set to false until you get it working to avoid issues
-        secure: __prod__, // cookie only works in https (only if using https in prod)
-        sameSite: "lax", // csrf
-      },
-      saveUninitialized: false,
-      secret: "hkvdcgyiwvkceerv", // use some random string
-      resave: false,
-    })
-  );
 
   // creates apollo server with whatever we need
   const apolloServer = new ApolloServer({

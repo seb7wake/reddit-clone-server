@@ -11,7 +11,6 @@ import {
   Resolver,
 } from "type-graphql";
 import { MyContext } from "src/types";
-import { RequiredEntityData } from "@mikro-orm/core";
 import argon2 from "argon2";
 
 // an alternative way to the @Arg() decorator to pass arguments into resolvers (see registerUser function)
@@ -45,6 +44,20 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+  @Query(() => User, { nullable: true })
+  async me(@Ctx() context: MyContext) {
+    // not logged in
+    if (!context.req.session.userId) {
+      return null;
+    }
+    // logged in
+    const user = await context.em.findOne(User, {
+      id: context.req.session.userId,
+    });
+    console.log(context.req.session);
+    return user;
+  }
+
   @Query(() => [User])
   // @Ctx allows function to access the context of type MyContext (orm.em in this case)
   users(@Ctx() context: MyContext): Promise<User[]> {
@@ -101,9 +114,12 @@ export class UserResolver {
     const user = context.em.create(User, {
       username,
       password: hashedPassowrd,
-    } as RequiredEntityData<User>);
+    } as User);
     // hash password using argon2 so that it is secure
     await context.em.persistAndFlush(user);
+    // adding session for user (logs them in)
+    context.req.session.userId = user.id;
+
     return { user };
   }
 
@@ -125,6 +141,12 @@ export class UserResolver {
         errors: [{ field: "username", message: "Incorrect Password" }],
       };
     }
+
+    // adding session for user
+    // this is how we store the session in redis
+    // redis key-value store looks something like: { session: hbchiwbehve -> {userId: 1} }
+    context.req.session.userId = user.id;
+
     return { user };
   }
 }
